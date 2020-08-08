@@ -36,6 +36,9 @@ def main(root, target_regex, user_agent, fetching_rate_limit, target_fetch_delay
     assert target_regex
     assert user_agent
     assert checkpoint_output_dir
+    exponential_backoff = float(exponential_backoff) if (exponential_backoff is not None) else None
+    if exponential_backoff is not None:
+        assert 1 < exponential_backoff < 10
     compiled = [re.compile(x) for x in target_regex]
     def target_link_filter(url):
         for x in compiled:
@@ -56,7 +59,7 @@ def main(root, target_regex, user_agent, fetching_rate_limit, target_fetch_delay
         fetching_ratelimit=fetching_rate_limit,
         discovery_delay=rediscovery_delay,
         fetch_delay=target_fetch_delay,
-        exponential_backoff=exponential_backoff,
+        exponential_backoff=float(exponential_backoff),
         verbose=True,
     )
     if summary_output_dir:
