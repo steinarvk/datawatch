@@ -61,6 +61,8 @@ class FetcherLoop(object):
                 consecutive_nochange[0] += 1
             else:
                 consecutive_nochange[0] = 0
+            print(url, "has changed?", changed, "nochange counter now at", consecutive_nochange[0])
+            last_content[0] = content
             self._on_fetched(url, resp, content)
         print("adding new target for", url)
         self._loop.schedule_task(
