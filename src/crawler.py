@@ -29,7 +29,9 @@ import storage
               help="Desired delay between summaries.")
 @click.option("--checkpoint_delay", default=30,
               help="Desired delay between checkpoint attempts.")
-def main(root, target_regex, user_agent, fetching_rate_limit, target_fetch_delay, rediscovery_delay, checkpoint_output_dir, summary_output_dir, summary_delay, checkpoint_delay):
+@click.option("--exponential_backoff", default=None,
+              help="Increase time to next fetch for resources that don't change much.")
+def main(root, target_regex, user_agent, fetching_rate_limit, target_fetch_delay, rediscovery_delay, checkpoint_output_dir, summary_output_dir, summary_delay, checkpoint_delay, exponential_backoff):
     assert root
     assert target_regex
     assert user_agent
@@ -54,6 +56,7 @@ def main(root, target_regex, user_agent, fetching_rate_limit, target_fetch_delay
         fetching_ratelimit=fetching_rate_limit,
         discovery_delay=rediscovery_delay,
         fetch_delay=target_fetch_delay,
+        exponential_backoff=exponential_backoff,
         verbose=True,
     )
     if summary_output_dir:
