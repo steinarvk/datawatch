@@ -320,7 +320,6 @@ class Entry(object):
         else:
             assert full_history
             to_load = filenames_with_readers
-        print("XXX", "loading", len(to_load), "out of", len(stamped_fni_with_readers), "total files provided")
         n = 0
         for filename, reader in to_load:
             Entry._parse_dump_file(reader, handle_header=on_header, handle_record=on_record)
@@ -481,6 +480,10 @@ class Entry(object):
             last = inc
         assert self._versioninfo.last_contained_version == last.data_version == target
         return last
+
+    def read_data_bytes_at(self, data_version):
+        with self.read_data_at(data_version) as f:
+            return f.read()
     
     @contextlib.contextmanager
     def read_data_at(self, data_version):
@@ -578,12 +581,10 @@ class Collection(object):
         return methods.compute_key_hash(key)["digest"]
 
     def _try_get_entry_by_keyhash(self, keyhash):
-        print("tryingt to get entry", keyhash)
         try:
             return self._entries[keyhash]
         except KeyError:
             pass
-        print("attempt failed, loading", keyhash)
         # Attempt to load it.
         names = self._storage.list_filtered_chunks(keyhash_filter=[keyhash])
         if not names:
@@ -593,7 +594,6 @@ class Collection(object):
             entry.flush(dependency_chain_length_limit=0)
         else:
             entry = Entry.load_dumps(self._storage, names, full_history=True)
-        print("successfully? loaded keyhash", keyhash, entry)
         self._entries[keyhash] = entry
         self._keys.add(entry.key)
         self._keyhashes.add(entry.info.keyhash)
@@ -616,7 +616,6 @@ class Collection(object):
             self._entries[kh] = entry
             self._keys.add(entry.key)
             self._keyhashes.add(entry.info.keyhash)
-            print("created new entry; entries:", self._entries)
         else:
             entry.update_data(io.BytesIO(data), data_version)
         if entry.key != key:
@@ -638,7 +637,10 @@ class Collection(object):
             yield kh
 
     def __getitem__(self, keyhash):
-        return self._entries[keyhash]
+        rv = self._try_get_entry_by_keyhash(keyhash)
+        if rv is None:
+            raise KeyError(keyhash)
+        return rv
 
     def _determine_last_stored_version(self, keyhash, store):
         files = store.list_filtered_chunks(keyhash_filter=[keyhash])
@@ -650,16 +652,12 @@ class Collection(object):
     def _write_to_storage_and_flush(self, entry, store):
         kh = entry.info.keyhash
         last_stored_version = self._determine_last_stored_version(kh, store)
-        print("last stored version in", store, last_stored_version)
         if last_stored_version is None:
-            print("writing the first version to", store)
             entry.write_dump(store)
             return True
         have_more_recent = int(entry.current_version) > int(last_stored_version)
         if not have_more_recent:
-            print("no more recent -- nothing to write", entry.current_version, last_stored_version)
             return False
-        print("writing a more recent version to", store)
         entry.write_dump(store)
         return True
 
@@ -667,18 +665,30 @@ class Collection(object):
         did = False
         for kh in self:
             entry = self[kh]
-            print("syncing to other:", kh, entry, other_coll._storage)
             if self._write_to_storage_and_flush(entry, other_coll._storage):
                 did = True
         return did
 
+    def load_keyhash_from_storage(self, keyhash):
+        if self._try_get_entry_by_keyhash(keyhash) is None:
+            raise ValueError("keyhash data not found: {}".format(keyhash))
+
+    def get_keyhash_names_from_storage(self):
+        keyhashes = set()
+        for chunk in self._storage.list_chunks():
+            keyhashes.add(filenames.decode_filename(chunk).keyhash)
+        keyhashes = list(keyhashes)
+        keyhashes.sort()
+        return keyhashes
+
+    def load_all_from_storage(self):
+        for kh in self.get_keyhash_names_from_storage():
+            self.load_keyhash_from_storage(kh)
+
     def summarize_to(self, other_coll):
         hist = Collection(self._storage, full_history=True)
-        print("yay, we're trying to make history!")
         for kh in self:
-            print("trying to get historical loading of", kh)
             hist._try_get_entry_by_keyhash(kh)
-        print("we loaded", list(hist))
         hist._sync_to_other(other_coll)
 
     def sync_and_flush(self):
@@ -715,6 +725,5 @@ if __name__ == "__main__":
         time.sleep(5)
         coll.sync_and_flush()
         if (time.time() - last_summary) > 60:
-            print("ooh SYNC")
             coll.summarize_to(summarized)
             last_summary = time.time()
