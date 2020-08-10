@@ -82,6 +82,7 @@ class DataIncarnation(object):
     def __init__(self, data, data_version):
         self._ver = data_version
         self._data = data
+        self._memo_data_as_unicode = None
         content_hash = methods.compute_content_hash(data)
         self._content_hash_digest = content_hash["digest"]
         self._metadata = IncarnationHeader(
@@ -95,6 +96,25 @@ class DataIncarnation(object):
         if self.content_hash_digest != other.content_hash_digest:
             return False
         return self.data == other.data
+
+    def get_data_as_bytes_or_unicode(self):
+        if self._memo_data_as_unicode is not None:
+            if self._memo_data_as_unicode is False:
+                return self._data
+            return self._memo_data_as_unicode
+        try:
+            decoded = self._data.decode("utf-8")
+        except UnicodeDecodeError:
+            self._memo_data_as_unicode = False
+            return self._data
+        self._memo_data_as_unicode = decoded
+        return self._memo_data_as_unicode
+
+    def get_data_as_unicode(self):
+        rv = self.get_data_as_bytes_or_unicode()
+        if isinstance(rv, bytes):
+            raise UnicodeDecodeError("unicode decode error cached from earlier")
+        return rv
 
     @property
     def data(self):
@@ -227,6 +247,7 @@ class DataIncarnation(object):
 class Entry(object):
     def __init__(self, key, versioninfo, dependency_chain_length, incarnations):
         self._key = key
+        self._keyhash = methods.compute_key_hash(key)["digest"]
         self._versioninfo = versioninfo
         self._chain_length = dependency_chain_length
         self._incarnations = incarnations
@@ -505,8 +526,16 @@ class Entry(object):
         for inc in self.loaded_versions():
             yield inc
 
+    def incarnations(self):
+        for inc in self._incarnations:
+            yield inc
+
     def loaded_versions(self):
         return [inc.data_version for inc in self._incarnations]
+
+    @property
+    def keyhash(self):
+        return self._keyhash
 
     @property
     def current_content_hash_digest(self):
@@ -567,6 +596,28 @@ def _make_example():
     new_entry.update_data(io.BytesIO((xs+"a"+ys).encode("utf-8")), "124000002")
     new_entry.update_data(io.BytesIO((xs+"z"+ys).encode("utf-8")), "124000702")
     return new_entry
+
+def read_streaming(store, key_filter=None, include_unchanged=False):
+    assert key_filter or (key_filter is None)
+    keyhashes = Collection(store).get_keyhash_names_from_storage()
+    only_keys = only_keyhashes = None
+    if key_filter is not None:
+        only_keys = set(key_filter)
+        only_keyhashes = set(methods.compute_key_hash(k)["digest"] for k in only_keys)
+    for kh in keyhashes:
+        if (key_filter is not None) and kh not in only_keyhashes:
+            continue
+        # TODO optimize or at least make actually streaming.
+        # don't need to load the entire history at once.
+        entry = Collection(store, full_history=True)[kh]
+        if (key_filter is not None) and entry.key not in only_keys:
+            continue
+        last_data = None
+        for inc in entry.incarnations():
+            if inc.data == last_data and not include_unchanged:
+                continue
+            last_data = inc.data
+            yield entry, inc
 
 class Collection(object):
     def __init__(self, storage, flush_settings=None, full_history=False):
