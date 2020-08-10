@@ -6,6 +6,8 @@ certifi==2020.6.20
 chardet==3.0.4
 click==7.1.2
 dataclasses==0.6
+guppy3==3.0.10.post1
+heapy==0.6
 idna==2.10
 importlib-metadata==1.7.0
 iniconfig==1.0.1
@@ -17,6 +19,7 @@ pluggy==0.13.1
 py==1.9.0
 pyparsing==2.4.7
 pytest==6.0.1
+PyYAML==5.3.1
 requests==2.24.0
 six==1.15.0
 soupsieve==2.0.1

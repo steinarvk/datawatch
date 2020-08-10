@@ -31,11 +31,17 @@ import storage
               help="Desired delay between checkpoint attempts.")
 @click.option("--exponential_backoff", default=None,
               help="Increase time to next fetch for resources that don't change much.")
-def main(root, target_regex, user_agent, fetching_rate_limit, target_fetch_delay, rediscovery_delay, checkpoint_output_dir, summary_output_dir, summary_delay, checkpoint_delay, exponential_backoff):
+@click.option("--heap-profiling/--no-heap-profiling",
+              default=False, show_default=True, type=bool,
+              help="Regularly dump a heap memory profile to stdout.")
+def main(root, target_regex, user_agent, fetching_rate_limit, target_fetch_delay, rediscovery_delay, checkpoint_output_dir, summary_output_dir, summary_delay, checkpoint_delay, exponential_backoff, heap_profiling):
     assert root
     assert target_regex
     assert user_agent
     assert checkpoint_output_dir
+    if heap_profiling:
+        import guppy
+        heap_profiler = guppy.hpy()
     exponential_backoff = float(exponential_backoff) if (exponential_backoff is not None) else None
     if exponential_backoff is not None:
         assert 1 < exponential_backoff < 10
@@ -70,6 +76,10 @@ def main(root, target_regex, user_agent, fetching_rate_limit, target_fetch_delay
     mainloop.schedule_nonfetching_task(callback=sync_to_checkpoints, delay=checkpoint_delay, reschedule=True)
     for oneroot in root:
         mainloop.add_discovery_root(oneroot)
+    if heap_profiling:
+        def dump_heap_profile(task):
+            print(heap_profiler.heap())
+        mainloop.schedule_nonfetching_task(callback=dump_heap_profile, delay=10, reschedule=True)
     mainloop.run_loop()
 
 if __name__ == "__main__":
