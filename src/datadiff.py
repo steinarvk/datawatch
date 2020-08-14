@@ -750,10 +750,12 @@ class Collection(object):
     
     def _sync_and_flush_single(self, kh):
         entry = self[kh]
+        did = False
         if self._write_to_storage_and_flush(entry, self._storage):
             did = True
         entry.flush(**self._flush_settings)
         self._last_flushed[kh] = time.time()
+        return did
 
     def summarize_one_to(self, other_coll):
         kh = random.choice(list(self))
