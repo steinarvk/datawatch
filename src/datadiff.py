@@ -627,6 +627,7 @@ class Collection(object):
         self._keyhashes = set()
         self._flush_settings = dict(flush_settings or {})
         self._full_history = full_history
+        self._last_flushed = {}
 
     def _compute_keyhash(self, key):
         return methods.compute_key_hash(key)["digest"]
