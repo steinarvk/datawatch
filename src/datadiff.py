@@ -736,20 +736,51 @@ class Collection(object):
         for kh in self.get_keyhash_names_from_storage():
             self.load_keyhash_from_storage(kh)
 
-    def summarize_to(self, other_coll):
+    def _summarize_to_specific(self, other_coll, khs):
         hist = Collection(self._storage, full_history=True)
-        for kh in self:
+        for kh in khs:
             hist._try_get_entry_by_keyhash(kh)
         hist._sync_to_other(other_coll)
 
-    def sync_and_flush(self):
-        did = False
-        for kh in self:
-            entry = self[kh]
-            if self._write_to_storage_and_flush(entry, self._storage):
-                did = True
-            entry.flush(**self._flush_settings)
-        return did
+    def summarize_to(self, other_coll):
+        return self._summarize_to_specific(other_coll, list(self))
+    
+    def _sync_and_flush_single(self, kh):
+        entry = self[kh]
+        if self._write_to_storage_and_flush(entry, self._storage):
+            did = True
+        entry.flush(**self._flush_settings)
+        self._last_flushed[kh] = time.time()
+
+    def summarize_one_to(self, other_coll):
+        kh = random.choice(list(self))
+        return self._summarize_to_specific(other_coll, [kh])
+
+    def sync_and_flush_one(self):
+        khs = list(self)
+        tried = set()
+        while True:
+            never_flushed = []
+            items = []
+            for kh in khs:
+                if kh in tried:
+                    continue
+                if kh not in self._last_flushed:
+                    never_flushed.append(kh)
+                else:
+                    items.append((self._last_flushed[kh], kh))
+            if never_flushed:
+                chosen = random.choice(never_flushed)
+            else:
+                if not items:
+                    return False
+                items.sort()
+                _, chosen = items[0]
+            tried.add(chosen)
+            did = self._sync_and_flush_single(chosen)
+            if did:
+                return True
+        return False
 
 if __name__ == "__main__":
     import sys

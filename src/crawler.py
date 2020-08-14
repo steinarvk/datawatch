@@ -57,7 +57,7 @@ def main(root, target_regex, user_agent, fetching_rate_limit, target_fetch_delay
     def on_fetched(target_url, resp, content):
         coll.update_data(target_url, content, now())
     def sync_to_checkpoints(task):
-        coll.sync_and_flush()
+        coll.sync_and_flush_one()
     mainloop = fetcher.FetcherLoop(
         on_fetched=on_fetched,
         user_agent=user_agent,
@@ -71,7 +71,7 @@ def main(root, target_regex, user_agent, fetching_rate_limit, target_fetch_delay
     if summary_output_dir:
         summary_coll = datadiff.Collection(storage.LocalFileStorage(summary_output_dir))
         def do_summaries(task):
-            coll.summarize_to(summary_coll)
+            coll.summarize_one_to(summary_coll)
         mainloop.schedule_nonfetching_task(callback=do_summaries, delay=summary_delay, reschedule=True)
     mainloop.schedule_nonfetching_task(callback=sync_to_checkpoints, delay=checkpoint_delay, reschedule=True)
     for oneroot in root:
