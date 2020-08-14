@@ -11,6 +11,7 @@ import io
 import json
 import operator
 import codecs
+import random
 
 _FORMAT_MAGIC = "datadiff"
 _FORMAT_VERSION = "0.0.1"
