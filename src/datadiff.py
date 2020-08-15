@@ -95,6 +95,8 @@ class DataIncarnation(object):
         self._memo = {}
 
     def same_data_as(self, other):
+        if other is None:
+            return False
         if self.content_hash_digest != other.content_hash_digest:
             return False
         return self.data == other.data
@@ -125,6 +127,10 @@ class DataIncarnation(object):
     @property
     def data_version(self):
         return self._ver
+
+    @property
+    def content_length(self):
+        return len(self._data)
 
     @property
     def content_hash_digest(self):
