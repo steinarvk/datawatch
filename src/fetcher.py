@@ -12,8 +12,9 @@ class FetcherLoop(object):
         self._fetch_delay = fetch_delay
         session = requests.session()
         headers = {"User-Agent": user_agent}
+        timeout = 60
         def geturl(url, allow_failure=False):
-            resp = session.get(url, headers=headers)
+            resp = session.get(url, headers=headers, timeout=timeout)
             # TODO: on receiving Last-Modified, cache responses and send If-Modified-Since in headers
             print("getting url", url, "got it:", resp)
             if not allow_failure:
